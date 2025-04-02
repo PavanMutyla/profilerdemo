@@ -116,13 +116,13 @@ class LLMService:
         }
     }
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o", cache_size: int = 100):
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o-mini", cache_size: int = 100):
         """
         Initialize the LLM service with API credentials.
         
         Args:
             api_key: API key for the LLM service (OpenAI by default)
-            model: Model to use for generation ("gpt-4o" by default)
+            model: Model to use for generation ("gpt-4o-mini" by default)
             cache_size: Maximum number of responses to cache (default 100)
         """
         # Use provided API key or get from environment

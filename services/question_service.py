@@ -13,14 +13,22 @@ class QuestionLogger:
     Creates and maintains logs of all question events for each profile.
     """
     
-    def __init__(self, log_dir="/Users/coddiwomplers/Desktop/Python/Profiler4/data/question_logs"):
+    def __init__(self, log_dir=None):
         """Initialize the question logger with the specified log directory"""
-        self.log_dir = log_dir
+        # Use a relative path or user's home directory by default
+        self.log_dir = log_dir or os.path.join(os.path.expanduser("~"), "profiler_question_logs")
         
         # Create the log directory if it doesn't exist
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-            
+        try:
+            if not os.path.exists(self.log_dir):
+                os.makedirs(self.log_dir)
+        except Exception as e:
+            # Fallback to current directory if we can't create the preferred directory
+            self.log_dir = "question_logs"
+            if not os.path.exists(self.log_dir):
+                os.makedirs(self.log_dir)
+            logging.warning(f"Could not create log directory at {log_dir}, using {self.log_dir} instead: {str(e)}")
+        
         # Dictionary to store in-memory logs before writing to file
         self.question_logs = {}
     

@@ -6,6 +6,7 @@ import copy
 import sqlite3
 from datetime import datetime
 from contextlib import contextmanager
+from config import Config  # Import the Config class
 
 class DatabaseProfileManager:
     """
@@ -13,13 +14,15 @@ class DatabaseProfileManager:
     Uses SQLite for persistent storage with JSON serialization of profile data.
     """
     
-    def __init__(self, db_path="/Users/coddiwomplers/Desktop/Python/Profiler4/data/profiles.db"):
+    def __init__(self, db_path=None):
         """
         Initialize the DatabaseProfileManager with SQLite database.
         
         Args:
             db_path (str): Path to SQLite database file
         """
+        if db_path is None:
+            db_path = Config.DB_PATH  # Use the DB_PATH from Config if not provided
         self.db_path = db_path
         
         # Ensure the parent directory exists

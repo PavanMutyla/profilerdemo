@@ -18,6 +18,9 @@ class Config:
     # Database settings
     DB_PATH = os.environ.get('DB_PATH') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'profiles.db')
     
+    # Use a more specific path for the database to avoid permission issues
+    DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'profiles.db')
+    
     # LLM settings
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
     OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o')

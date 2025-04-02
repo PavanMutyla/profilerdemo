@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 import uuid
 import functools
+import sqlite3
 
 # Import our custom modules
 from models.database_profile_manager import DatabaseProfileManager
@@ -15,6 +16,7 @@ from services.question_service import QuestionService
 from services.llm_service import LLMService
 from services.profile_analytics_service import ProfileAnalyticsService
 from config import Config
+from RAG.fetch_user_details import fetch_user_data  # Import the function
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -41,6 +43,55 @@ llm_service = LLMService(api_key=Config.OPENAI_API_KEY, model=Config.OPENAI_MODE
 question_service = QuestionService(question_repository, profile_manager, llm_service)
 profile_analytics_service = ProfileAnalyticsService(profile_manager)
 goal_manager = GoalManager(db_path=Config.DB_PATH)
+
+DATABASE = 'data/users.db'  # Separate database for user authentication
+
+def get_db():
+    """Get database connection."""
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row  # Access columns by name
+    return conn
+
+def create_user(username, password, email):
+    """Create a new user in the database."""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO users (username, password, email) VALUES (?, ?, ?)",
+            (username, password, email)  # Hash the password in a real application!
+        )
+        conn.commit()
+        user_id = cursor.lastrowid
+        return {"id": user_id, "username": username, "email": email}
+    except sqlite3.IntegrityError:
+        # Handle username already exists error
+        return None
+    finally:
+        conn.close()
+
+def authenticate_user(username, password):
+    """Authenticate user against the database."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM users WHERE username = ? AND password = ?",  # Hash the password in a real application!
+        (username, password)
+    )
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+def update_user_profile_id(user, profile_id):
+    """Update user's profile_id in the database."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET profile_id = ? WHERE id = ?",
+        (profile_id, user['id'])
+    )
+    conn.commit()
+    conn.close()
 
 @app.route('/')
 def index():
@@ -604,6 +655,75 @@ def admin_metrics():
             metrics['category_completion'][category] = round(metrics['category_completion'][category], 1)
     
     return render_template('admin/metrics.html', metrics=metrics)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """User login route."""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        # *** Replace with your actual authentication logic ***
+        # This is a placeholder - implement your user authentication here
+        user = authenticate_user(username, password)  # Example authentication function
+
+        if user:
+            # Authentication successful
+            session['profile_id'] = user.profile_id  # Store profile_id in session
+            return redirect(url_for('profile'))  # Redirect to profile page
+        else:
+            # Authentication failed
+            flash('Invalid username or password.')
+            return render_template('login.html')  # Or wherever your login form is
+
+    # Render login form (for GET requests)
+    return render_template('login.html')
+
+@app.route('/profile')
+def profile():
+    """User profile route."""
+    if 'profile_id' in session:
+        profile_id = session['profile_id']
+        db_manager = DatabaseProfileManager()
+        profile = db_manager.get_profile(profile_id)
+
+        if profile:
+            return render_template('profile.html', profile=profile)  # Pass profile to template
+        else:
+            flash('Profile not found.')
+            return redirect(url_for('login'))
+    else:
+        return redirect(url_for('login'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """User registration route."""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        email = request.form.get('email')
+
+        # *** Replace with your actual user creation logic ***
+        user = create_user(username, password, email)  # Example user creation function
+
+        if user:
+            # User creation successful, now create a profile
+            db_manager = DatabaseProfileManager()
+            profile = db_manager.create_profile(username, email)  # Create profile
+
+            # *** Store profile_id in your user table ***
+            user.profile_id = profile['id']
+            update_user_profile_id(user, profile['id'])  # Example update function
+
+            flash('Registration successful. Please log in.')
+            return redirect(url_for('login'))
+        else:
+            # User creation failed
+            flash('Registration failed. Please try again.')
+            return render_template('register.html')
+
+    # Render registration form (for GET requests)
+    return render_template('register.html')
 
 if __name__ == '__main__':
     # Run the app with the configured debug setting
