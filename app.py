@@ -17,6 +17,7 @@ from services.llm_service import LLMService
 from services.profile_analytics_service import ProfileAnalyticsService
 from config import Config
 from RAG.fetch_user_details import fetch_user_data  # Import the function
+from RAG.rag import graph  # Import the graph from rag.py
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -97,7 +98,6 @@ def update_user_profile_id(user, profile_id):
 def index():
     """Landing page"""
     return render_template('index.html')
-
 @app.route('/profile/create', methods=['GET', 'POST'])
 def create_profile():
     """Create a new profile"""
@@ -663,18 +663,23 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        # *** Replace with your actual authentication logic ***
-        # This is a placeholder - implement your user authentication here
-        user = authenticate_user(username, password)  # Example authentication function
+        conn = get_db()
+        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        conn.close()
 
-        if user:
-            # Authentication successful
-            session['profile_id'] = user.profile_id  # Store profile_id in session
-            return redirect(url_for('profile'))  # Redirect to profile page
+        if user and user['password'] == password:  # WARNING: Never store passwords in plain text
+            session['username'] = username
+            session['profile_id'] = user['profile_id']  # Assuming you have a profile_id in the users table
+
+            # Fetch user data here
+            user_data = fetch_user_data(user['profile_id'])  # Use the function from RAG/fetch_user_details.py
+            session['user_data'] = user_data
+
+            flash('Logged in successfully!', 'success')
+            return redirect(url_for('index'))  # Redirect to the main page
         else:
-            # Authentication failed
-            flash('Invalid username or password.')
-            return render_template('login.html')  # Or wherever your login form is
+            flash('Invalid username or password', 'danger')
+            return render_template('login.html')
 
     # Render login form (for GET requests)
     return render_template('login.html')
@@ -724,6 +729,35 @@ def register():
 
     # Render registration form (for GET requests)
     return render_template('register.html')
+
+@app.route('/rag', methods=['GET'])
+def rag_page():
+    """Render the RAG query page."""
+    return render_template('rag_query.html')
+
+@app.route('/rag/query', methods=['POST'])
+def rag_query():
+    """Handle user queries using the RAG model."""
+    user_query = request.json.get('query')  # Get the query from the request
+    if not user_query:
+        return jsonify({'error': 'No query provided'}), 400
+
+    # Get user data from the session
+    user_data = session.get('user_data', {})  # Default to an empty dictionary if no user data
+
+    # Prepare the input for the graph
+    inputs = {"query": user_query, "user_data": user_data} # Pass user_data to the graph
+    
+    # Invoke the graph with the user's query
+    result = graph.invoke(inputs)
+
+    # Return the generated response
+    return jsonify({
+        'generation': result.get('generation', 'No response generated.'),
+        'question': result.get('question', user_query)  # Return the original question if needed
+    })
+    # Return the generated response
+ 
 
 if __name__ == '__main__':
     # Run the app with the configured debug setting

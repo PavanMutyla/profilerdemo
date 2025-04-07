@@ -16,20 +16,3 @@ def fetch_user_data(profile_id):
         print(profile)  # Print or process the profile data as needed
     else:
         print("Profile not found.")
-
-if __name__ == "__main__":
-
-   db_manager = DatabaseProfileManager()
-   all_profiles = db_manager.get_all_profiles()
-   if all_profiles:
-        print("All User Profile Data:")
-        for profile_summary in all_profiles:
-            profile_id = profile_summary['id']
-            profile = db_manager.get_profile(profile_id)
-            if profile:
-              print(f"\nProfile ID: {profile_id}")
-              print(profile)
-            else:
-               print(f"Profile not found for ID: {profile_id}")
-else:
-        print("No profiles found in the database.")

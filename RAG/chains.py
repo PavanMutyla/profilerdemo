@@ -22,7 +22,7 @@ system = """You are a grader assessing relevance of a retrieved document to a us
 
 grade_prompt = ChatPromptTemplate.from_messages([
     ("system", system),
-    ("human", "Retrieved document: \n\n {documents} \n\n User question: {question}")
+    ("human", "Retrieved document: \n\n {data} \n\n User question: {query}")
 ])
 
 retrieval_grader = grade_prompt | structured_llm_grader
@@ -31,12 +31,14 @@ retrieval_grader = grade_prompt | structured_llm_grader
 prompt = PromptTemplate(
     template='''
     You are a Registered Investment Advisor with expertise in Indian financial markets and client relations.
-    You must understand what the user is asking about their financial investments and respond to their queries based on the information in the documents only.
+    You must understand what the user is asking about their financial investments and respond to their queries based on the information in the documents and user's financial and demographic profile only.
+    Prioritize answer based on the user's profile and if there is not much profile data, prioritize user's query and answer.
     Use the following documents to answer the question. If you do not know the answer, say you don't know.
-    Query: {question}
-    Documents: {context}
+    Query: {query}
+    Documents: {data}
+    User's Data : {user_data}
     ''',
-    input_variables=['question', 'context']
+    input_variables=['query', 'data', 'user_data']
 )
 
 rag_chain = prompt | llm | StrOutputParser()
@@ -50,7 +52,7 @@ re_write_prompt = ChatPromptTemplate.from_messages(
         ("system", system_rewrite),
         (
             "human",
-            "Here is the initial question: \n\n {question} \n Formulate an improved question.",
+            "Here is the initial question: \n\n {query} \n Formulate an improved question.",
         ),
     ]
 )
@@ -58,8 +60,17 @@ re_write_prompt = ChatPromptTemplate.from_messages(
 question_rewriter = re_write_prompt | llm | StrOutputParser()
 
 
+from pydantic import BaseModel, Field, RootModel
+from typing import Dict
+from langchain_core.output_parsers import JsonOutputParser
+
+# Define the Pydantic model using RootModel
+class CategoryProbabilities(RootModel):
+    """Probabilities for different knowledge base categories."""
+    root: Dict[str, float] = Field(description="Dictionary mapping category names to probability scores")
+
 system_classifier = """You are a query classifier that determines the most relevant knowledge bases (KBs) for a given user query. 
-Analyze the semantic meaning and intent of the query and assign probability scores (between 0 and 1) to each KB. 
+Analyze the semantic meaning and intent of the query and assign probability scores (between 0 and 1) to each KB.
 
 Ensure the probabilities sum to 1 and output a JSON dictionary with category names as keys and probabilities as values.
 """
@@ -70,11 +81,17 @@ classification_prompt = ChatPromptTemplate.from_messages(
         (
             "human",
             "Here is the user query: \n\n {query} \n\n Assign probability scores to each of the following KBs:\n"
-            "{categories}\n\nReturn a JSON object like:\n"
-            '{"Product Categories": 0.3, "Investment Regulations": 0.4, "Taxation Data": 0.2, "Market Segments": 0.1, "Cultural Aspects": 0.0}',
+            "{categories}\n\nReturn a JSON object with category names as keys and probability scores as values."
         ),
     ]
 )
 
-query_classifier = classification_prompt | llm | StrOutputParser()
+# Create a JSON output parser
+json_parser = JsonOutputParser(pydantic_object=CategoryProbabilities)
+
+# Create the chain with the structured output parser
+query_classifier = classification_prompt | llm | json_parser
+
+
+#query_classifier = classification_prompt | llm | StrOutputParser()
 

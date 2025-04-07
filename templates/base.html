@@ -16,6 +16,7 @@
             <nav>
                 <ul>
                     <li><a href="{{ url_for('index') }}">Home</a></li>
+                    <li><a href="{{ url_for('rag_page') }}">RAG Query</a></li>
                     {% if session.get('profile_id') %}
                     <li><a href="{{ url_for('questions') }}">Continue Profile</a></li>
                     <li><a href="{{ url_for('switch_profile') }}">Switch Profile</a></li>

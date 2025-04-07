@@ -6,4 +6,7 @@ class KBCategory(str, Enum):
     TaxationDetails = "taxation_details"
     MarketSegments = "market_segments"
     CulturalAspects = "cultural_aspects"
+    General = "general"
 
+class THRESHOLD(Enum):
+    threshold = 0.2
